@@ -1,0 +1,15 @@
+#V2
+aaa
+"SELECT a, b, 123, myfunc(b) \\\n           FROM table_1 \\\n           WHERE a > b AND b < 100 \\\n           ORDER BY a DESC, b"
+SELECT a, b, 123, myfunc(b) \\\n           FROM table_1 \\\n           WHERE a > b AND b < 100 \\\n           ORDER BY a DESC, b
+SELECT a, b, 123, myfunc(b) FROM table_1  WHERE a > b AND b < 100  ORDER BY a DESC, b
+SELECT a, b, 123, myfunc(b) \nFROM table_1  WHERE a > b AND b < 100  \nORDER BY a DESC, b
+a
+SELECT a, b, 123, myfunc(b) \nFROM table_1  WHERE a > b AND b < 100  \nORDER BY a DESC, b
+a
+source /tmp/abc.parquet
+SELECT a, b, 123, myfunc(b) \nFROM table_1  WHERE a > b AND b < 100  \nORDER BY a DESC, b
+SOURCE
+SOURCE a
+load
+COPY abc From '/tmp/asdf'

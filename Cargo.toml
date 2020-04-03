@@ -1,0 +1,9 @@
+[package]
+name = "mura"
+version = "0.1.0"
+authors = ["Sujith Jay Nair <sujith@sujithjay.com>"]
+edition = "2018"
+
+[dependencies]
+rustyline = "6.1.0"
+sqlparser = "0.5.0"
