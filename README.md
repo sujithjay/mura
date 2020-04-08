@@ -1,5 +1,7 @@
 # Mura
 ![Mura](./resources/Hanasaka-Jiijii.jpg)
+
+## What
 An in-memory SQL Query Compiler built on Apache Arrow.
 
 ## Etymology
