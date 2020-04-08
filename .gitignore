@@ -9,4 +9,7 @@
 /target
 
 #Mura History
-/mura.txt
+**/*mura.txt
+
+#Misc
+**/*.DS_Store
