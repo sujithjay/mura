@@ -1,8 +1,7 @@
 # Mura
-![Mura](./resources/Hanasaka-Jiijii.jpg)
-
-## What
 An in-memory SQL Query Compiler built on Apache Arrow.
+
+![Mura](./resources/Hanasaka-Jiijii.jpg)
 
 ## Etymology
 Named after [Yoshiko Futamura](https://fi.ftmr.info/), namesake of the Futamura Projections.
