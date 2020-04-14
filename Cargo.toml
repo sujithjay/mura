@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 rustyline = "6.1.0"
 sqlparser = "0.5.0"
+arrow = "0.16.0"
+anyhow = "1.0.28"

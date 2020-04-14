@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(warnings)]
+
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 mod parser;
-
-mod error{
-    use std::error;
-    pub type Result<T> = std::result::Result<T, Box<dyn error::Error>>;
-}
 
 fn main() {
     let mut rl = Editor::<()>::new();
