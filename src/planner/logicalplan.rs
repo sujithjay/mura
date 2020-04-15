@@ -175,4 +175,72 @@ impl ScalarValue {
     }
 }
 
-pub struct LogicalPlan{}
+/// LogicalPlan represents different types of relations.
+#[derive(Clone)]
+pub enum LogicalPlan {
+    /// A Projection
+    Projection {
+        /// The list of expressions
+        expr: Vec<Expr>,
+        /// The incoming logic plan
+        input: Arc<LogicalPlan>,
+        /// Schema
+        schema: Arc<Schema>,
+    },
+    /// A Selection
+    Selection {
+        /// The expression
+        expr: Expr,
+        /// The incoming logic plan
+        input: Arc<LogicalPlan>,
+    },
+    /// Represents a list of sort expressions to be applied to a relation
+    Sort {
+        /// The sort expressions
+        expr: Vec<Expr>,
+        /// The incoming logic plan
+        input: Arc<LogicalPlan>,
+        /// Schema
+        schema: Arc<Schema>,
+    },
+    /// A scan against a catalog table
+    Scan {
+        /// The name of the schema
+        schema_name: String,
+        /// The name of the table
+        table_name: String,
+        /// The table schema
+        table_schema: Arc<Schema>,
+        /// The schema, if projections are applied on scan
+        projected_schema: Arc<Schema>,
+        /// Projection columns on the scan
+        projection: Option<Vec<usize>>,
+    },
+    /// An empty relation with an empty schema
+    EmptyRelation {
+        /// Schema
+        schema: Arc<Schema>,
+    },
+    /// Represents the maximum number of records to return
+    Limit {
+        /// The expression
+        expr: Expr,
+        /// The logical plan
+        input: Arc<LogicalPlan>,
+        /// Schema 
+        schema: Arc<Schema>,
+    },
+    /// Represents a create external table expression.
+    CreateExternalTable {
+        /// The table schema
+        schema: Arc<Schema>,
+        /// The table name
+        name: String,
+        /// The physical location
+        location: String,
+        /// The file type of physical file
+        file_type: FileType,
+        /// Whether the CSV file contains a header
+        header_row: bool,
+    },
+}
