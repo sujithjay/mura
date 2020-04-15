@@ -14,9 +14,10 @@
 
 use anyhow::anyhow;
 use anyhow::Result;
-use arrow::datatypes::Schema;
+use arrow::datatypes::*;
 use sqlparser::ast::BinaryOperator;
 use sqlparser::ast::Expr;
+use sqlparser::ast::UnaryOperator;
 use std::sync::Arc;
 
 use crate::planner::catalog::SchemaCatalog;
@@ -39,7 +40,7 @@ impl QueryPlanner {
         Ok(LogicalPlan{})
     }
 
-    pub fn to_relational_expression(&self, parsed_expr: &Expr, schema: &Schema) ->Result<Expression>{
+    pub fn to_relational_expression(&self, parsed_expr: &Expr, schema: &Schema) -> Result<Expression> {
         match *parsed_expr {
             Expr::Value(sqlparser::ast::Value::Boolean(b)) => Ok(Expression::Literal(ScalarValue::Boolean(b))),
             Expr::Value(sqlparser::ast::Value::Date(_)) => Err(anyhow!("Date Literals are currently not supported.")),
@@ -79,16 +80,42 @@ impl QueryPlanner {
                 })
             },
 
-            Expr::Cast{expr, data_type} => {
-                let resolved_expr = self.to_relational_expression(expr, schema);
+            Expr::Cast{ref expr, ref data_type} => {
+                let resolved_expr = self.to_relational_expression(expr, schema)?;
                 Ok(Expression::Cast{
-                    expr: resolved_expr,
-                    data_type: data_type,
+                    expr: Arc::new(resolved_expr),
+                    data_type: to_arrow_type(data_type)?,
                 })
             },
+
+            Expr::UnaryOp{ref op, ref expr} => match op {
+                UnaryOperator::Not => Ok(Expression::Not(Arc::new(self.to_relational_expression(expr, schema)?))),
+                other => Err(anyhow!("{:?} not implemented!", other))
+            }
+
+            Expr::IsNull(ref expr) => Ok(Expression::IsNull(Arc::new(self.to_relational_expression(expr, schema)?))),
+            Expr::IsNotNull(ref expr) => Ok(Expression::IsNotNull(Arc::new(self.to_relational_expression(expr, schema)?))),
 
             _ => Err(anyhow!("{:?} not implemented!", parsed_expr)),
             
         }
+    }
+}
+
+/// Convert parser data types to Arrow data types
+pub fn to_arrow_type(parser_dt: &sqlparser::ast::DataType) -> Result<DataType> {
+    match parser_dt {
+        sqlparser::ast::DataType::Boolean => Ok(DataType::Boolean),
+        sqlparser::ast::DataType::SmallInt => Ok(DataType::Int16),
+        sqlparser::ast::DataType::Int => Ok(DataType::Int32),
+        sqlparser::ast::DataType::BigInt => Ok(DataType::Int64),
+        sqlparser::ast::DataType::Float(_) | sqlparser::ast::DataType::Real => Ok(DataType::Float64),
+        sqlparser::ast::DataType::Double => Ok(DataType::Float64),
+        sqlparser::ast::DataType::Char(_) | sqlparser::ast::DataType::Varchar(_) => Ok(DataType::Utf8),
+        sqlparser::ast::DataType::Timestamp => Ok(DataType::Timestamp(TimeUnit::Nanosecond, None)),
+        other => Err(anyhow!(
+            "Unsupported parser data-type {:?}",
+            other
+        )),
     }
 }
