@@ -18,8 +18,8 @@ use arrow::datatypes::*;
 
 use crate::planner::logicalplan::*;
 
-/// Create field meta-data from an expression, for use in a result set schema
-pub fn expr_to_field(e: &Expression, input_schema: &Schema) -> Result<Field> {
+/// Create an arrow Field from an Expression
+pub fn expression_to_field(e: &Expression, input_schema: &Schema) -> Result<Field> {
     match e {
         Expression::UnresolvedColumn(name) => Ok(input_schema.column_with_name(&name).unwrap().1.clone()),
         Expression::Column(i) => {
@@ -61,7 +61,7 @@ pub fn expr_to_field(e: &Expression, input_schema: &Schema) -> Result<Field> {
     }
 }
 
-/// Create field meta-data from an expression, for use in a result set schema
+/// Create arrow Fields from Expressions
 pub fn exprlist_to_fields(expr: &Vec<Expression>, input_schema: &Schema) -> Result<Vec<Field>> {
     expr.iter()
         .map(|e| expr_to_field(e, input_schema))
