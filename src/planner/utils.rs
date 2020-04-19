@@ -64,6 +64,6 @@ pub fn expression_to_field(e: &Expression, input_schema: &Schema) -> Result<Fiel
 /// Create arrow Fields from Expressions
 pub fn exprlist_to_fields(expr: &Vec<Expression>, input_schema: &Schema) -> Result<Vec<Field>> {
     expr.iter()
-        .map(|e| expr_to_field(e, input_schema))
+        .map(|e| expression_to_field(e, input_schema))
         .collect()
 }
