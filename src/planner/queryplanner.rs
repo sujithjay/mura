@@ -15,16 +15,12 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use arrow::datatypes::*;
-use sqlparser::ast::BinaryOperator;
-use sqlparser::ast::Expr;
-use sqlparser::ast::UnaryOperator;
+use arrow::datatypes::DataType;
+use sqlparser::ast::*;
 use std::sync::Arc;
 
 use crate::planner::catalog::SchemaCatalog;
-use crate::planner::logicalplan::Expression;
-use crate::planner::logicalplan::LogicalPlan;
-use crate::planner::logicalplan::Operator;
-use crate::planner::logicalplan::ScalarValue;
+use crate::planner::logicalplan::*;
 
 pub struct QueryPlanner{
     catalog: Arc<dyn SchemaCatalog>,
@@ -36,9 +32,46 @@ impl QueryPlanner {
         Arc::new(QueryPlanner { catalog })
     }
 
-    pub fn to_logical_plan(&self, parsed_expr: &Expr) -> Result<LogicalPlan> {
-        Ok(LogicalPlan{})
-    }
+    pub fn to_logical_plan(&self, statements: Vec<Statement>) -> Result<LogicalPlan> {
+        match statements.get(0).unwrap() {
+            Statement::Query(q) => {
+                if !q.ctes.is_empty() {
+                    return Err(anyhow!("CTEs are currently not supported."))
+                    };
+                if q.offset.is_some() {
+                    return Err(anyhow!("Offset is currently not supported."))
+                    };
+                if q.fetch.is_some() {
+                    return Err(anyhow!("Fetch is currently not supported."))
+                    };
+                
+                match q.body {
+                    SetExpr::Select(ref sel) => {
+                        let table = &sel.from.get(0).unwrap().relation;
+                        match table {
+                            TableFactor::Table { name, alias, args, with_hints } => match self.catalog.fetch_table_info(&format!("{}", name)) {
+                                    Some(schema) => Ok(LogicalPlanBuilder::scan(
+                                        "default",
+                                        &format!("{}", name),
+                                        schema.as_ref(),
+                                        None,
+                                    )?
+                                    .build()?),
+                                    None => Err(anyhow!(
+                                        "no schema found for table {}",
+                                        name
+                                    )),
+                                },
+                            _ => Err(anyhow!("Derived tables not implemented!")),
+                        }
+                    },
+                    _ => Err(anyhow!("Not implemented!")), 
+                }
+            }
+            _ => Err(anyhow!("Not implemented!")),
+            
+            }
+        }
 
     pub fn to_relational_expression(&self, parsed_expr: &Expr, schema: &Schema) -> Result<Expression> {
         match *parsed_expr {
