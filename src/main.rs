@@ -17,6 +17,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 mod parser;
+mod planner;
 
 fn main() {
     let mut rl = Editor::<()>::new();
