@@ -17,6 +17,9 @@ use anyhow::anyhow;
 use arrow::datatypes::{DataType, Schema};
 use std::sync::Arc;
 
+use crate::parser::FileType;
+use crate::planner::utils;
+
 
 /// A Relation Expression
 #[derive(Clone, PartialEq)]
@@ -100,6 +103,11 @@ impl Expression {
     }
 }
 
+/// Create a column expression based on a column index
+pub fn col_index(index: usize) -> Expression {
+    Expression::Column(index)
+}
+
 /// Operators applied to Expressions
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operator {
@@ -181,7 +189,7 @@ pub enum LogicalPlan {
     /// A Projection
     Projection {
         /// The list of expressions
-        expr: Vec<Expr>,
+        expr: Vec<Expression>,
         /// The incoming logic plan
         input: Arc<LogicalPlan>,
         /// Schema
@@ -190,14 +198,14 @@ pub enum LogicalPlan {
     /// A Selection
     Selection {
         /// The expression
-        expr: Expr,
+        expr: Expression,
         /// The incoming logic plan
         input: Arc<LogicalPlan>,
     },
     /// Represents a list of sort expressions to be applied to a relation
     Sort {
         /// The sort expressions
-        expr: Vec<Expr>,
+        expr: Vec<Expression>,
         /// The incoming logic plan
         input: Arc<LogicalPlan>,
         /// Schema
@@ -224,7 +232,7 @@ pub enum LogicalPlan {
     /// Represents the maximum number of records to return
     Limit {
         /// The expression
-        expr: Expr,
+        expr: Expression,
         /// The logical plan
         input: Arc<LogicalPlan>,
         /// Schema 
@@ -243,4 +251,121 @@ pub enum LogicalPlan {
         /// Whether the CSV file contains a header
         header_row: bool,
     },
+}
+
+impl LogicalPlan {
+    /// Get a reference to the logical plan's schema
+    pub fn schema(&self) -> &Arc<Schema> {
+        match self {
+            LogicalPlan::EmptyRelation { schema } => &schema,
+            LogicalPlan::Scan {
+                projected_schema, ..
+            } => &projected_schema,
+            LogicalPlan::Projection { schema, .. } => &schema,
+            LogicalPlan::Selection { input, .. } => input.schema(),
+            LogicalPlan::Sort { schema, .. } => &schema,
+            LogicalPlan::Limit { schema, .. } => &schema,
+            LogicalPlan::CreateExternalTable { schema, .. } => &schema,
+        }
+    }
+}
+
+/// Builder for logical plans
+pub struct LogicalPlanBuilder {
+    plan: LogicalPlan,
+}
+
+impl LogicalPlanBuilder {
+    /// Create a builder from an existing plan
+    pub fn from(plan: &LogicalPlan) -> Self {
+        Self { plan: plan.clone() }
+    }
+
+    /// Create an empty relation
+    pub fn empty() -> Self {
+        Self::from(&LogicalPlan::EmptyRelation {
+            schema: Arc::new(Schema::empty()),
+        })
+    }
+
+    /// Scan a data source
+    pub fn scan(
+        schema_name: &str,
+        table_name: &str,
+        table_schema: &Schema,
+        projection: Option<Vec<usize>>,
+    ) -> Result<Self> {
+        let projected_schema = projection.clone().map(|p| {
+            Schema::new(p.iter().map(|i| table_schema.field(*i).clone()).collect())
+        });
+        Ok(Self::from(&LogicalPlan::Scan {
+            schema_name: schema_name.to_owned(),
+            table_name: table_name.to_owned(),
+            table_schema: Arc::new(table_schema.clone()),
+            projected_schema: Arc::new(
+                projected_schema.or(Some(table_schema.clone())).unwrap(),
+            ),
+            projection,
+        }))
+    }
+
+    /// Apply a projection
+    pub fn project(&self, expr: Vec<Expression>) -> Result<Self> {
+        let input_schema = self.plan.schema();
+        let projected_expr = if expr.contains(&Expression::Wildcard) {
+            let mut expr_vec = vec![];
+            (0..expr.len()).for_each(|i| match &expr[i] {
+                Expression::Wildcard => {
+                    (0..input_schema.fields().len())
+                        .for_each(|i| expr_vec.push(col_index(i).clone()));
+                }
+                _ => expr_vec.push(expr[i].clone()),
+            });
+            expr_vec
+        } else {
+            expr.clone()
+        };
+
+        let schema = Schema::new(utils::exprlist_to_fields(
+            &projected_expr,
+            input_schema.as_ref(),
+        )?);
+
+        Ok(Self::from(&LogicalPlan::Projection {
+            expr: projected_expr,
+            input: Arc::new(self.plan.clone()),
+            schema: Arc::new(schema),
+        }))
+    }
+
+    /// Apply a filter
+    pub fn filter(&self, expr: Expression) -> Result<Self> {
+        Ok(Self::from(&LogicalPlan::Selection {
+            expr,
+            input: Arc::new(self.plan.clone()),
+        }))
+    }
+
+    /// Apply a limit
+    pub fn limit(&self, expr: Expression) -> Result<Self> {
+        Ok(Self::from(&LogicalPlan::Limit {
+            expr,
+            input: Arc::new(self.plan.clone()),
+            schema: self.plan.schema().clone(),
+        }))
+    }
+
+    /// Apply a sort
+    pub fn sort(&self, expr: Vec<Expression>) -> Result<Self> {
+        Ok(Self::from(&LogicalPlan::Sort {
+            expr,
+            input: Arc::new(self.plan.clone()),
+            schema: self.plan.schema().clone(),
+        }))
+    }
+
+    /// Build the plan
+    pub fn build(&self) -> Result<LogicalPlan> {
+        Ok(self.plan.clone())
+    }
 }
