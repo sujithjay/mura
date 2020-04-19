@@ -17,6 +17,12 @@ use sqlparser::ast::Statement;
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
 
+#[derive(Debug, Clone)]
+pub enum FileType {
+    /// Apache Parquet
+    Parquet,
+}
+
 /// A sample query is: 
 ///     CREATE EXTERNAL TABLE userdata STORED AS PARQUET LOCATION 
 ///     'mura/src/examples/userdata1.parquet';
