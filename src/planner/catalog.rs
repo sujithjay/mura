@@ -13,9 +13,20 @@
 // limitations under the License.
 
 use arrow::datatypes::Schema;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// SchemaCatalog provides metadata about tables referenced in SQL statements
 pub trait SchemaCatalog {
     fn fetch_table_info(&self, name: &str) -> Option<Arc<Schema>>;
+}
+
+pub struct DummySchemaCatalog {
+    pub datasource: HashMap<String, Option<Arc<Schema>>>,
+}
+
+impl SchemaCatalog for DummySchemaCatalog{
+    fn fetch_table_info(&self, name: &str) -> Option<Arc<Schema>> {
+        self.datasource.get(name).unwrap().clone()
+    }
 }
