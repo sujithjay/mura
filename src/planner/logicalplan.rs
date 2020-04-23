@@ -22,7 +22,7 @@ use crate::planner::utils;
 
 
 /// A Relation Expression
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     /// Reference to column by name
     UnresolvedColumn(String),
@@ -184,7 +184,7 @@ impl ScalarValue {
 }
 
 /// LogicalPlan represents different types of relations.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum LogicalPlan {
     /// A Projection
     Projection {
