@@ -32,7 +32,7 @@ impl QueryPlanner {
         Arc::new(QueryPlanner { catalog })
     }
 
-    pub fn to_logical_plan(&self, statements: Vec<Statement>) -> Result<LogicalPlan> {
+    pub fn to_logical_plan(&self, statements: &Vec<Statement>) -> Result<LogicalPlan> {
         match statements.get(0).unwrap() {
             Statement::Query(q) => {
                 if !q.ctes.is_empty() {
