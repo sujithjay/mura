@@ -19,6 +19,7 @@ use arrow::datatypes::DataType;
 use sqlparser::ast::*;
 use std::sync::Arc;
 
+use crate::parser::FileType;
 use crate::planner::catalog::SchemaCatalog;
 use crate::planner::logicalplan::*;
 
@@ -67,6 +68,30 @@ impl QueryPlanner {
                     },
                     _ => Err(anyhow!("Not implemented!")), 
                 }
+            }
+
+            Statement::CreateTable{
+                name,
+                columns,
+                constraints,
+                with_options,
+                external,
+                file_format,
+                location,
+            } => {
+                let schema = Arc::new(self.build_schema(columns)?);
+                let file_type = match *file_format {
+                    Some(FileFormat::PARQUET) => Some(FileType::Parquet),
+                    _ => None,
+                };
+
+                Ok(LogicalPlan::CreateTable {
+                    name: name.to_string(),
+                    schema: schema,
+                    external: *external,
+                    file_type: file_type,
+                    location: Some(location.as_ref().unwrap().to_string()),
+                })
             }
             _ => Err(anyhow!("Not implemented!")),
             
@@ -132,6 +157,18 @@ impl QueryPlanner {
             _ => Err(anyhow!("{:?} not implemented!", parsed_expr)),
             
         }
+    }
+
+    fn build_schema(&self, columns: &Vec<ColumnDef>) -> Result<Schema> {
+        let mut fields = Vec::new();
+    
+        for column in columns {
+            let data_type = to_arrow_type(&column.data_type)?;
+            let nullable = if column.options.iter().any(|e| e.option == ColumnOption::NotNull) { false } else { true };
+            fields.push(Field::new(&column.name, data_type, nullable));
+        }
+    
+        Ok(Schema::new(fields))
     }
 }
 
