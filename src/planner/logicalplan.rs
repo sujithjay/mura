@@ -238,18 +238,18 @@ pub enum LogicalPlan {
         /// Schema 
         schema: Arc<Schema>,
     },
-    /// Represents a create external table expression.
-    CreateExternalTable {
-        /// The table schema
-        schema: Arc<Schema>,
+    /// Represents a create table expression.
+    CreateTable {
         /// The table name
         name: String,
-        /// The physical location
-        location: String,
+        /// The table schema
+        schema: Arc<Schema>,
+        /// If the table is external
+        external: bool,
         /// The file type of physical file
-        file_type: FileType,
-        /// Whether the CSV file contains a header
-        header_row: bool,
+        file_type: Option<FileType>,
+        /// The physical location
+        location: Option<String>,
     },
 }
 
@@ -265,7 +265,7 @@ impl LogicalPlan {
             LogicalPlan::Selection { input, .. } => input.schema(),
             LogicalPlan::Sort { schema, .. } => &schema,
             LogicalPlan::Limit { schema, .. } => &schema,
-            LogicalPlan::CreateExternalTable { schema, .. } => &schema,
+            LogicalPlan::CreateTable { schema, .. } => &schema,
         }
     }
 }
