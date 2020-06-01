@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod parser;
+mod planner;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
-mod parser;
-mod planner;
+use planner::queryplanner;
+use planner::catalog::DummySchemaCatalog;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 fn main() {
     let mut rl = Editor::<()>::new();
@@ -33,8 +37,11 @@ fn main() {
                  } 
                 else {
                     rl.add_history_entry(line.as_str());
-                    let statement = parser::parse(line).ok();
-                    println!("{:?}", statement.unwrap());
+                    let statement = parser::parse(line).ok().unwrap();
+                    let catalog = DummySchemaCatalog{ datasource : HashMap::new() };
+                    let qp = queryplanner::QueryPlanner::new(Arc::new(catalog));
+                    let plan = qp.to_logical_plan(&statement).ok();
+                    println!("{:?}", &plan.unwrap());
                 }
             },
             Err(ReadlineError::Interrupted) => {
