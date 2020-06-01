@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::Result;
-use sqlparser::ast::Statement;
-use sqlparser::dialect::PostgreSqlDialect;
-use sqlparser::parser::Parser;
+use arrow::datatypes::Schema;
+use std::collections::HashMap;
+use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub enum FileType {
-    /// Apache Parquet
-    Parquet,
+/// SchemaCatalog provides metadata about tables referenced in SQL statements
+pub trait SchemaCatalog {
+    fn fetch_table_info(&self, name: &str) -> Option<Arc<Schema>>;
 }
 
-/// A sample query is: 
-///     CREATE EXTERNAL TABLE userdata STORED AS PARQUET LOCATION 
-///     'mura/src/examples/userdata1.parquet';
-pub fn parse(query: String) -> Result<Vec<Statement>> {
-    let dialect = PostgreSqlDialect {};
-    return Parser::parse_sql(&dialect, query).map_err(|e| e.into());
+pub struct DummySchemaCatalog {
+    pub datasource: HashMap<String, Option<Arc<Schema>>>,
+}
+
+impl SchemaCatalog for DummySchemaCatalog{
+    fn fetch_table_info(&self, name: &str) -> Option<Arc<Schema>> {
+        self.datasource.get(name).unwrap().clone()
+    }
 }
