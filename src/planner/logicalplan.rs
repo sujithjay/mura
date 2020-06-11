@@ -15,6 +15,7 @@
 use anyhow::Result;
 use anyhow::anyhow;
 use arrow::datatypes::{DataType, Schema};
+use std::fmt;
 use std::sync::Arc;
 
 use crate::parser::FileType;
@@ -101,11 +102,29 @@ impl Expression {
             _ => Err(anyhow!("Expression not implemented in Mura.")),
         }
     }
+
+    pub fn eq(&self, other: &Expression) -> Expression {
+        Expression::BinaryExpression {
+            left: Arc::new(self.clone()),
+            op: Operator::Eq,
+            right: Arc::new(other.clone()),
+        }
+    }
 }
 
 /// Create a column expression based on a column index
 pub fn col_index(index: usize) -> Expression {
     Expression::Column(index)
+}
+
+/// Create a column expression based on a column name
+pub fn col(name: &str) -> Expression {
+    Expression::UnresolvedColumn(name.to_owned())
+}
+
+/// Create a literal string expression
+pub fn lit_str(str: &str) -> Expression {
+    Expression::Literal(ScalarValue::Utf8(str.to_owned()))
 }
 
 /// Operators applied to Expressions
@@ -184,7 +203,7 @@ impl ScalarValue {
 }
 
 /// LogicalPlan represents different types of relations.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum LogicalPlan {
     /// A Projection
     Projection {
@@ -267,6 +286,78 @@ impl LogicalPlan {
             LogicalPlan::Limit { schema, .. } => &schema,
             LogicalPlan::CreateTable { schema, .. } => &schema,
         }
+    }
+}
+
+impl LogicalPlan {
+    fn fmt_with_indent(&self, f: &mut fmt::Formatter, indent: usize) -> fmt::Result {
+        if indent > 0 {
+            writeln!(f)?;
+            for _ in 0..indent {
+                write!(f, "  ")?;
+            }
+        }
+        match *self {
+            LogicalPlan::EmptyRelation { .. } => write!(f, "EmptyRelation"),
+            LogicalPlan::Scan {
+                ref table_name,
+                ref projection,
+                ..
+            } => write!(f, "Scan: {} projection={:?}", table_name, projection),
+            LogicalPlan::Projection {
+                ref expr,
+                ref input,
+                ..
+            } => {
+                write!(f, "Projection: ")?;
+                for i in 0..expr.len() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}", expr[i])?;
+                }
+                input.fmt_with_indent(f, indent + 1)
+            }
+            LogicalPlan::Selection {
+                ref expr,
+                ref input,
+                ..
+            } => {
+                write!(f, "Selection: {:?}", expr)?;
+                input.fmt_with_indent(f, indent + 1)
+            }
+            LogicalPlan::Sort {
+                ref input,
+                ref expr,
+                ..
+            } => {
+                write!(f, "Sort: ")?;
+                for i in 0..expr.len() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}", expr[i])?;
+                }
+                input.fmt_with_indent(f, indent + 1)
+            }
+            LogicalPlan::Limit {
+                ref input,
+                ref expr,
+                ..
+            } => {
+                write!(f, "Limit: {:?}", expr)?;
+                input.fmt_with_indent(f, indent + 1)
+            }
+            LogicalPlan::CreateTable { ref name, .. } => {
+                write!(f, "CreateTable: {:?}", name)
+            }
+        }
+    }
+}
+
+impl fmt::Debug for LogicalPlan {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -367,5 +458,42 @@ impl LogicalPlanBuilder {
     /// Build the plan
     pub fn build(&self) -> Result<LogicalPlan> {
         Ok(self.plan.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::datatypes::Field;
+
+    #[test]
+    fn test_simple_plan_builder() -> Result<()> {
+        let plan = LogicalPlanBuilder::scan(
+            "company",
+            "employee",
+            &employee_schema(),
+            Some(vec![0, 3]),
+        )?
+        .filter(col("state").eq(&lit_str("CO")))?
+        .project(vec![col("id")])?
+        .build()?;
+
+        let expected = "Projection: UnresolvedColumn(\"id\")\
+        \n  Selection: BinaryExpression { left: UnresolvedColumn(\"state\"), op: Eq, right: Literal(Utf8(\"CO\")) }\
+        \n    Scan: employee projection=Some([0, 3])";
+
+        assert_eq!(expected, format!("{:?}", plan));
+        Ok(())
+
+    }
+
+    fn employee_schema() -> Schema {
+        Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("first_name", DataType::Utf8, false),
+            Field::new("last_name", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("salary", DataType::Int32, false),
+        ])
     }
 }
